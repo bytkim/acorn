@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Acron</title>
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --panel: #14181d;
+      --panel-2: #1b2127;
+      --border: #262d35;
+      --text: #e6e9ee;
+      --muted: #8a94a3;
+      --accent: #7c8cff;
+      --accent-2: #5ee2c5;
+      --danger: #ef4444;
+      --ok: #10b981;
+      --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(124, 140, 255, 0.18), transparent 60%),
+        radial-gradient(900px 500px at -10% 100%, rgba(94, 226, 197, 0.12), transparent 60%),
+        var(--bg);
+      min-height: 100vh;
+    }
+
+    header {
+      max-width: 1100px; margin: 0 auto;
+      padding: 28px 32px 12px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand { display: flex; align-items: baseline; gap: 12px; }
+    .brand h1 {
+      margin: 0; font-size: 22px; letter-spacing: -0.01em;
+      font-weight: 600;
+    }
+    .brand .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent-2);
+      box-shadow: 0 0 16px var(--accent-2);
+      display: inline-block;
+    }
+    .brand small { color: var(--muted); font-size: 13px; }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 32px 80px; }
+
+    .hero {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+    .hero h2 { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+    .hero p { margin: 0; color: var(--muted); max-width: 560px; }
+
+    button, .btn {
+      font: inherit; cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 10px 16px;
+      border-radius: 10px;
+      transition: border-color .15s, background .15s, transform .05s;
+    }
+    button:hover, .btn:hover { border-color: var(--accent); }
+    button:active { transform: translateY(1px); }
+    .btn-primary {
+      background: linear-gradient(180deg, var(--accent), #5d6cf0);
+      border-color: transparent;
+      color: white;
+      font-weight: 500;
+      padding: 12px 20px;
+    }
+    .btn-primary:hover { border-color: transparent; filter: brightness(1.08); }
+    .btn-danger {
+      background: transparent; color: var(--danger);
+      border-color: rgba(239, 68, 68, 0.25);
+    }
+    .btn-danger:hover { border-color: var(--danger); }
+
+    .section-title {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin: 8px 4px 14px;
+    }
+    .section-title h3 { margin: 0; font-size: 14px; font-weight: 600;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .section-title span { color: var(--muted); font-size: 13px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      position: relative;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      display: flex; flex-direction: column; gap: 8px;
+      transition: border-color .15s, transform .15s;
+      color: inherit;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .card .stretched {
+      position: absolute; inset: 0; border-radius: inherit;
+      text-indent: -9999px; overflow: hidden; z-index: 0;
+    }
+    .card > *:not(.stretched) { position: relative; z-index: 1; }
+    .card .actions { position: relative; z-index: 2; }
+    .card .repo {
+      font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
+    }
+    .card .owner { color: var(--muted); font-weight: 400; margin-right: 1px; }
+    .card .meta {
+      color: var(--muted); font-size: 13px;
+      display: flex; gap: 14px; flex-wrap: wrap;
+    }
+    .card .meta b { color: var(--text); font-weight: 600; }
+    .card .actions {
+      display: flex; gap: 8px; margin-top: 10px;
+      padding-top: 12px; border-top: 1px solid var(--border);
+    }
+    .card .actions form { display: inline; }
+
+    .empty {
+      border: 1px dashed var(--border);
+      border-radius: 14px; padding: 48px;
+      text-align: center; color: var(--muted);
+    }
+
+    /* flash messages */
+    .flashes { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+    .flash {
+      border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;
+      border: 1px solid var(--border); background: var(--panel);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .flash.ok { border-color: rgba(16, 185, 129, 0.4); }
+    .flash.error { border-color: rgba(239, 68, 68, 0.4); }
+    .flash.warn { border-color: rgba(245, 158, 11, 0.4); }
+    .flash::before {
+      content: ""; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted);
+    }
+    .flash.ok::before { background: var(--ok); }
+    .flash.error::before { background: var(--danger); }
+    .flash.warn::before { background: var(--warn); }
+
+    /* modal */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
+      z-index: 50;
+      animation: fade .15s ease-out;
+    }
+    .modal-backdrop.open { display: flex; }
+    @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes pop {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal {
+      width: min(520px, calc(100% - 32px));
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      animation: pop .18s ease-out;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+    }
+    .modal h3 { margin: 0 0 4px; font-size: 18px; }
+    .modal p { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+    .modal label {
+      display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px;
+    }
+    .modal input[type="url"] {
+      width: 100%; padding: 12px 14px;
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 10px;
+      font: inherit; outline: none;
+      transition: border-color .15s;
+    }
+    .modal input[type="url"]:focus { border-color: var(--accent); }
+    .modal .examples {
+      margin-top: 8px; font-size: 12px; color: var(--muted);
+    }
+    .modal .examples code {
+      background: var(--panel-2); padding: 2px 6px; border-radius: 6px;
+      cursor: pointer;
+    }
+    .modal-actions {
+      display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px;
+    }
+
+    /* loading state shown after submit */
+    .modal[data-loading="true"] form { display: none; }
+    .modal[data-loading="true"] h3,
+    .modal[data-loading="true"] > p { display: none; }
+    .loading-stage {
+      display: none; flex-direction: column; align-items: center; gap: 18px;
+      padding: 12px 0 8px;
+    }
+    .modal[data-loading="true"] .loading-stage { display: flex; }
+    .spinner {
+      width: 48px; height: 48px; border-radius: 50%;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      border-right-color: var(--accent-2);
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-title {
+      font-size: 16px; font-weight: 600;
+      background: linear-gradient(90deg, var(--muted), var(--text), var(--muted));
+      background-size: 200% 100%;
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 2s infinite linear;
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .loading-stages {
+      display: flex; flex-direction: column; gap: 8px; width: 100%;
+      padding: 12px 16px; background: var(--panel-2);
+      border: 1px solid var(--border); border-radius: 10px;
+      font-size: 13px;
+    }
+    .loading-stages .stage {
+      display: flex; align-items: center; gap: 10px;
+      color: var(--muted);
+      transition: color .2s;
+    }
+    .loading-stages .stage .marker {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 1.5px solid var(--border);
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; color: transparent;
+    }
+    .loading-stages .stage.done { color: var(--text); }
+    .loading-stages .stage.done .marker {
+      background: var(--ok); border-color: var(--ok); color: var(--bg);
+    }
+    .loading-stages .stage.done .marker::after { content: "✓"; font-weight: 700; }
+    .loading-stages .stage.active { color: var(--text); }
+    .loading-stages .stage.active .marker {
+      border-color: var(--accent);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(124, 140, 255, 0.6); }
+      50% { box-shadow: 0 0 0 6px rgba(124, 140, 255, 0); }
+    }
+    .loading-elapsed {
+      color: var(--muted); font-size: 12px;
+      font-variant-numeric: tabular-nums; font-family: ui-monospace, monospace;
+    }
+    .loading-hint {
+      color: var(--muted); font-size: 12px; text-align: center;
+      max-width: 360px; line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>Acron</h1>
+      <small>code map &middot; semantic search</small>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <a class="btn" href="{{ url_for('settings') }}">Settings</a>
+      <button class="btn-primary" onclick="openModal()">+ Index repository</button>
+    </div>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flashes">
+        {% for cat, msg in messages %}
+          <div class="flash {{ cat }}">{{ msg }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <main>
+    {% if not repos %}
+      <div class="hero">
+        <div>
+          <h2>Welcome to Acron</h2>
+          <p>Paste a public GitHub URL to extract every function, class, and type into a searchable map. Ask questions in plain English; results come back ranked by semantic similarity, not keywords.</p>
+        </div>
+        <button class="btn-primary" onclick="openModal()">+ Index your first repo</button>
+      </div>
+      <div class="empty">No repositories indexed yet.</div>
+    {% else %}
+      <div class="section-title">
+        <h3>Indexed repositories</h3>
+        <span>{{ repos|length }} total</span>
+      </div>
+      <div class="grid">
+        {% for r in repos %}
+          <div class="card">
+            <a class="stretched" href="{{ url_for('repo_detail', repo_id=r['repo_id']) }}"
+               aria-label="Open {{ r['owner'] }}/{{ r['repo_name'] }}">open</a>
+            <div class="repo">
+              <span class="owner">{{ r['owner'] }}/</span><span>{{ r['repo_name'] }}</span>
+            </div>
+            <div class="meta">
+              <span><b>{{ r['file_count'] }}</b> files</span>
+              <span><b>{{ r['sym_count'] }}</b> symbols</span>
+            </div>
+            <div class="meta" title="{{ r['indexed_at'] }}">
+              indexed {{ r['indexed_at'][:10] }}
+            </div>
+            <div class="actions">
+              <a class="btn" href="{{ r['github_url'] }}" target="_blank" rel="noopener">View on GitHub ↗</a>
+              <form method="post" action="{{ url_for('delete_repo', repo_id=r['repo_id']) }}"
+                    onsubmit="return confirm('Delete this repo and all its symbols?')">
+                <button type="submit" class="btn-danger">Delete</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </main>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" id="modal" onclick="if(event.target===this && card.getAttribute('data-loading')!=='true') closeModal()">
+    <div class="modal" id="modal-card">
+      <h3>Index a GitHub repository</h3>
+      <p>Acron will clone it, extract every function and class with tree-sitter, and embed each snippet for semantic search.</p>
+      <form method="post" action="{{ url_for('index_repo_route') }}" onsubmit="onIndexSubmit()">
+        <label for="github_url">GitHub URL</label>
+        <input type="url" id="github_url" name="github_url"
+               placeholder="https://github.com/owner/repo"
+               required autofocus
+               pattern="https://github\.com/.+/.+" />
+        <div class="examples">
+          Try:
+          <code onclick="fillUrl(this)">https://github.com/sindresorhus/slugify</code>
+          <code onclick="fillUrl(this)">https://github.com/pallets/itsdangerous</code>
+        </div>
+        <div class="modal-actions">
+          <button type="button" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Index</button>
+        </div>
+      </form>
+      <div class="loading-stage">
+        <div class="spinner"></div>
+        <div class="loading-title" id="loading-title">Indexing repository</div>
+        <div class="loading-stages" id="loading-stages">
+          <div class="stage" data-stage="0"><span class="marker"></span><span>Cloning repository</span></div>
+          <div class="stage" data-stage="1"><span class="marker"></span><span>Extracting symbols with tree-sitter</span></div>
+          <div class="stage" data-stage="2"><span class="marker"></span><span>Generating embeddings</span></div>
+          <div class="stage" data-stage="3"><span class="marker"></span><span>Storing vectors</span></div>
+        </div>
+        <div class="loading-elapsed" id="loading-elapsed">0.0s elapsed</div>
+        <div class="loading-hint">Larger repos can take 30–90 seconds. The page will redirect when indexing finishes.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const modal = document.getElementById('modal');
+    const card = document.getElementById('modal-card');
+    function openModal() {
+      modal.classList.add('open');
+      setTimeout(() => document.getElementById('github_url').focus(), 50);
+    }
+    function closeModal() {
+      modal.classList.remove('open');
+      card.removeAttribute('data-loading');
+    }
+    function onIndexSubmit() {
+      card.setAttribute('data-loading', 'true');
+      // We can't observe real progress (Flask blocks), so advance through
+      // stages on a rough timeline that matches typical run times.
+      const stages = document.querySelectorAll('.loading-stages .stage');
+      const elapsedEl = document.getElementById('loading-elapsed');
+      const startedAt = performance.now();
+      // Stage advance times in seconds (clone, extract, embed, store).
+      const advances = [0, 4, 12, 30];
+      let current = -1;
+      function tick() {
+        const elapsed = (performance.now() - startedAt) / 1000;
+        elapsedEl.textContent = elapsed.toFixed(1) + 's elapsed';
+        let target = 0;
+        for (let i = 0; i < advances.length; i++) {
+          if (elapsed >= advances[i]) target = i;
+        }
+        if (target !== current) {
+          current = target;
+          stages.forEach((s, i) => {
+            s.classList.toggle('active', i === current);
+            s.classList.toggle('done', i < current);
+          });
+        }
+      }
+      tick();
+      setInterval(tick, 100);
+    }
+    function fillUrl(el) {
+      document.getElementById('github_url').value = el.textContent.trim();
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.classList.contains('open')
+          && card.getAttribute('data-loading') !== 'true') closeModal();
+    });
+  </script>
+</body>
+</html>

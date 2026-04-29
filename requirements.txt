@@ -1,0 +1,4 @@
+flask
+cased-kit
+python-dotenv
+openai

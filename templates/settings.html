@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settings — Acron</title>
+  <style>
+    :root {
+      --bg: #0b0d10; --panel: #14181d; --panel-2: #1b2127;
+      --border: #262d35; --text: #e6e9ee; --muted: #8a94a3;
+      --accent: #7c8cff; --accent-2: #5ee2c5;
+      --ok: #10b981; --danger: #ef4444; --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(124, 140, 255, 0.18), transparent 60%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header {
+      max-width: 800px; margin: 0 auto;
+      padding: 28px 32px 12px;
+    }
+    .crumbs { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+    .crumbs a { color: var(--muted); }
+    h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.01em; }
+
+    main { max-width: 800px; margin: 0 auto; padding: 24px 32px 80px; }
+
+    .flashes { max-width: 800px; margin: 0 auto; padding: 0 32px; }
+    .flash {
+      border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;
+      border: 1px solid var(--border); background: var(--panel);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .flash.ok { border-color: rgba(16, 185, 129, 0.4); }
+    .flash.error { border-color: rgba(239, 68, 68, 0.4); }
+    .flash::before {
+      content: ""; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted);
+    }
+    .flash.ok::before { background: var(--ok); }
+    .flash.error::before { background: var(--danger); }
+
+    .card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; padding: 24px; margin-bottom: 16px;
+    }
+    .card h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+    .card .desc { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+    .card .desc a { color: var(--accent); }
+
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .field label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .field input {
+      padding: 10px 12px;
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; outline: none;
+    }
+    .field input:focus { border-color: var(--accent); }
+    .status {
+      font-size: 12px; color: var(--muted);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+    .status.set .dot { background: var(--ok); }
+    .status.env .dot { background: var(--warn); }
+
+    .actions {
+      display: flex; gap: 8px; justify-content: flex-end;
+      padding-top: 16px; border-top: 1px solid var(--border); margin-top: 8px;
+    }
+    button, .btn {
+      font: inherit; cursor: pointer;
+      padding: 10px 16px; border-radius: 10px;
+      background: var(--panel-2); color: var(--text);
+      border: 1px solid var(--border);
+    }
+    button:hover, .btn:hover { border-color: var(--accent); }
+    .btn-primary {
+      background: linear-gradient(180deg, var(--accent), #5d6cf0);
+      border-color: transparent; color: white; font-weight: 500;
+    }
+    .btn-primary:hover { filter: brightness(1.08); border-color: transparent; }
+    .btn-danger { color: var(--danger); border-color: rgba(239, 68, 68, 0.25); }
+    .btn-danger:hover { border-color: var(--danger); }
+
+    .row-clear { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .row-clear label { font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="crumbs"><a href="{{ url_for('home') }}">← All repositories</a></div>
+    <h1>Settings</h1>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flashes">
+        {% for cat, msg in messages %}
+          <div class="flash {{ cat }}">{{ msg }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <main>
+    <form method="post">
+      <div class="card">
+        <h2>OpenRouter API key</h2>
+        <p class="desc">Used by the chat agent. Get one at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys ↗</a>.</p>
+        <div class="field">
+          <label for="OPENROUTER_API_KEY">Key</label>
+          <input type="password" id="OPENROUTER_API_KEY" name="OPENROUTER_API_KEY"
+                 placeholder="{{ keys['OPENROUTER_API_KEY'].masked or 'sk-or-v1-…' }}"
+                 autocomplete="off" />
+          <div class="status {% if keys['OPENROUTER_API_KEY'].stored %}set{% elif keys['OPENROUTER_API_KEY'].env %}env{% endif %}">
+            <span class="dot"></span>
+            {% if keys['OPENROUTER_API_KEY'].stored %}
+              Stored ({{ keys['OPENROUTER_API_KEY'].masked }}) — leave blank to keep
+            {% elif keys['OPENROUTER_API_KEY'].env %}
+              Loaded from .env ({{ keys['OPENROUTER_API_KEY'].masked }}) — saving here will override
+            {% else %}
+              Not configured
+            {% endif %}
+          </div>
+          {% if keys['OPENROUTER_API_KEY'].stored %}
+            <div class="row-clear">
+              <input type="checkbox" id="clear_OPENROUTER_API_KEY" name="clear_OPENROUTER_API_KEY" />
+              <label for="clear_OPENROUTER_API_KEY">Clear stored key</label>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>GitHub token</h2>
+        <p class="desc">Optional. Lets you index private repos and avoid public rate limits. Create one at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens ↗</a> with <code>repo</code> scope.</p>
+        <div class="field">
+          <label for="KIT_GITHUB_TOKEN">Token</label>
+          <input type="password" id="KIT_GITHUB_TOKEN" name="KIT_GITHUB_TOKEN"
+                 placeholder="{{ keys['KIT_GITHUB_TOKEN'].masked or 'ghp_…' }}"
+                 autocomplete="off" />
+          <div class="status {% if keys['KIT_GITHUB_TOKEN'].stored %}set{% elif keys['KIT_GITHUB_TOKEN'].env %}env{% endif %}">
+            <span class="dot"></span>
+            {% if keys['KIT_GITHUB_TOKEN'].stored %}
+              Stored ({{ keys['KIT_GITHUB_TOKEN'].masked }}) — leave blank to keep
+            {% elif keys['KIT_GITHUB_TOKEN'].env %}
+              Loaded from .env ({{ keys['KIT_GITHUB_TOKEN'].masked }}) — saving here will override
+            {% else %}
+              Not configured
+            {% endif %}
+          </div>
+          {% if keys['KIT_GITHUB_TOKEN'].stored %}
+            <div class="row-clear">
+              <input type="checkbox" id="clear_KIT_GITHUB_TOKEN" name="clear_KIT_GITHUB_TOKEN" />
+              <label for="clear_KIT_GITHUB_TOKEN">Clear stored token</label>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="actions">
+        <a class="btn" href="{{ url_for('home') }}">Cancel</a>
+        <button class="btn-primary" type="submit">Save</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ repo['owner'] }}/{{ repo['repo_name'] }} — Acron</title>
+  <style>
+    :root {
+      --bg: #0b0d10; --panel: #14181d; --panel-2: #1b2127;
+      --border: #262d35; --text: #e6e9ee; --muted: #8a94a3;
+      --accent: #7c8cff; --accent-2: #5ee2c5;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(124, 140, 255, 0.18), transparent 60%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header {
+      max-width: 1100px; margin: 0 auto;
+      padding: 28px 32px 12px;
+    }
+    .crumbs { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+    .crumbs a { color: var(--muted); }
+    h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.01em; }
+    h1 .owner { color: var(--muted); font-weight: 400; }
+    .sub {
+      margin-top: 8px; color: var(--muted); font-size: 13px;
+      display: flex; gap: 16px; flex-wrap: wrap;
+    }
+    .sub b { color: var(--text); font-weight: 600; }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 32px 80px; }
+
+    .stats {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px; margin-bottom: 28px;
+    }
+    .stat {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px 16px;
+    }
+    .stat .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat .value { font-size: 22px; font-weight: 600; margin-top: 4px; }
+    .stat .value small { font-size: 13px; color: var(--muted); font-weight: 400; }
+
+    h3.section { margin: 28px 0 12px; font-size: 13px; font-weight: 600;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+    }
+    .row {
+      display: grid; grid-template-columns: 1fr auto auto;
+      gap: 16px; padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+    }
+    .row:last-child { border-bottom: 0; }
+    .row .path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row .num { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+    .pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      background: var(--panel-2); border: 1px solid var(--border);
+      border-radius: 999px; padding: 4px 12px; font-size: 12px;
+      color: var(--muted);
+    }
+    .pill b { color: var(--text); font-weight: 600; margin-right: 4px; }
+
+    /* symbols */
+    details.sym {
+      border-bottom: 1px solid var(--border);
+    }
+    details.sym:last-child { border-bottom: 0; }
+    details.sym > summary { cursor: pointer; list-style: none; font-size: 13px; }
+    details.sym > summary::-webkit-details-marker { display: none; }
+    details.sym > summary::marker { content: ""; }
+    .sym-row {
+      display: grid; grid-template-columns: 90px 1fr 80px;
+      gap: 12px; align-items: center;
+      padding: 8px 16px 8px 36px;
+    }
+    details.sym > summary:hover .sym-row { background: var(--panel-2); }
+
+    details.file { border-bottom: 1px solid var(--border); }
+    details.file:last-child { border-bottom: 0; }
+    details.file > summary { cursor: pointer; list-style: none; background: var(--panel); }
+    details.file > summary::-webkit-details-marker { display: none; }
+    details.file > summary::marker { content: ""; }
+    .file-row {
+      padding: 10px 16px 10px 36px;
+      display: grid; grid-template-columns: 14px 38px 1fr auto auto;
+      gap: 12px; align-items: center;
+    }
+    .basename {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 14px; font-weight: 500;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .lang {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+      padding: 2px 6px; border-radius: 5px; text-align: center;
+      font-family: ui-monospace, monospace;
+      background: var(--panel-2); color: var(--muted);
+      border: 1px solid var(--border);
+      min-width: 30px;
+    }
+    .lang.python { color: #4b8bbe; border-color: rgba(75, 139, 190, 0.4); background: rgba(75, 139, 190, 0.08); }
+    .lang.js     { color: #f0db4f; border-color: rgba(240, 219, 79, 0.35); background: rgba(240, 219, 79, 0.06); }
+    .lang.ts     { color: #3178c6; border-color: rgba(49, 120, 198, 0.4); background: rgba(49, 120, 198, 0.1); }
+    .lang.react  { color: #61dafb; border-color: rgba(97, 218, 251, 0.4); background: rgba(97, 218, 251, 0.08); }
+    .lang.go     { color: #00add8; border-color: rgba(0, 173, 216, 0.4); background: rgba(0, 173, 216, 0.08); }
+    .lang.ruby   { color: #cc342d; border-color: rgba(204, 52, 45, 0.4); background: rgba(204, 52, 45, 0.08); }
+    .lang.rust   { color: #dea584; border-color: rgba(222, 165, 132, 0.4); background: rgba(222, 165, 132, 0.06); }
+    .lang.java   { color: #b07219; border-color: rgba(176, 114, 25, 0.4); background: rgba(176, 114, 25, 0.06); }
+    .lang.c      { color: #b07cc6; border-color: rgba(176, 124, 198, 0.4); background: rgba(176, 124, 198, 0.06); }
+
+    /* directory section */
+    details.dir { background: var(--panel); }
+    details.dir + details.dir { border-top: 1px solid var(--border); }
+    details.dir > summary {
+      cursor: pointer; list-style: none;
+      background: var(--panel-2);
+      border-bottom: 1px solid var(--border);
+    }
+    details.dir > summary::-webkit-details-marker { display: none; }
+    details.dir > summary::marker { content: ""; }
+    .dir-row {
+      padding: 10px 16px;
+      display: grid; grid-template-columns: 14px 1fr auto;
+      gap: 12px; align-items: center;
+    }
+    .dir-row .caret { color: var(--muted); font-size: 11px; line-height: 1;
+      transition: transform .15s; display: inline-block; width: 12px; text-align: center; }
+    details.dir[open] > summary .dir-row .caret { transform: rotate(90deg); }
+    .dir-name {
+      font-family: ui-monospace, monospace;
+      font-size: 12px; color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .dir-name.root { font-style: italic; }
+    .dir-meta { color: var(--muted); font-size: 12px; }
+    .dir-meta b { color: var(--text); font-weight: 600; }
+    details.dir > summary:hover .dir-row { background: var(--bg); }
+    details.dir[hidden] { display: none; }
+    .caret {
+      color: var(--muted); font-size: 11px; line-height: 1;
+      transition: transform .15s; display: inline-block;
+      width: 12px; text-align: center;
+    }
+    details.file[open] > summary .caret { transform: rotate(90deg); }
+    details.file > summary:hover .file-row { background: var(--panel-2); }
+    details.file .sym-children {
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+    }
+    details.file[hidden] { display: none; }
+
+    .type-group { padding: 0; }
+    .type-header {
+      padding: 8px 16px 6px 36px; font-size: 11px;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em;
+      font-weight: 600;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+    }
+    .type-group:first-child .type-header { border-top: 0; }
+    .type-header b { color: var(--text); font-weight: 600; margin-left: 4px; }
+    .type-tag {
+      font-size: 11px; padding: 2px 8px; border-radius: 6px;
+      background: var(--panel-2); color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.04em;
+      text-align: center; font-weight: 500;
+    }
+    .type-tag.function { color: var(--accent); }
+    .type-tag.method   { color: var(--accent-2); }
+    .type-tag.class    { color: #f59e0b; }
+    .type-tag.type     { color: #c084fc; }
+    .sym-name { font-family: ui-monospace, monospace; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sym-file { font-family: ui-monospace, monospace; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sym-lines { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+
+    pre.snippet {
+      margin: 0; padding: 14px 16px; background: var(--bg);
+      font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-x: auto; color: #cbd5e1;
+      border-top: 1px solid var(--border);
+      max-height: 360px;
+    }
+
+    .toolbar {
+      display: flex; gap: 8px; align-items: center; margin-bottom: 12px;
+    }
+    .toolbar input {
+      flex: 1; padding: 10px 12px;
+      background: var(--panel); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      font: inherit; outline: none;
+    }
+    .toolbar input:focus { border-color: var(--accent); }
+    .toolbar select {
+      padding: 10px 12px;
+      background: var(--panel); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      font: inherit; outline: none;
+    }
+
+    /* semantic search */
+    .search-form {
+      display: flex; gap: 8px; margin-bottom: 16px;
+    }
+    .search-input {
+      flex: 1; padding: 12px 16px;
+      background: var(--panel); color: var(--text);
+      border: 1px solid var(--border); border-radius: 10px;
+      font: inherit; outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.15);
+    }
+    .btn-primary {
+      font: inherit; cursor: pointer;
+      padding: 12px 20px; border-radius: 10px;
+      background: linear-gradient(180deg, var(--accent), #5d6cf0);
+      border: 1px solid transparent; color: white; font-weight: 500;
+    }
+    .btn-primary:hover { filter: brightness(1.08); }
+    .btn-clear {
+      padding: 12px 16px; border-radius: 10px;
+      background: var(--panel); color: var(--muted);
+      border: 1px solid var(--border); text-decoration: none;
+      display: inline-flex; align-items: center;
+    }
+    .btn-clear:hover { color: var(--text); border-color: var(--accent); text-decoration: none; }
+
+    .results { margin-bottom: 28px; }
+    .results-header {
+      padding: 12px 16px; font-size: 13px; color: var(--muted);
+      background: var(--panel-2); border-bottom: 1px solid var(--border);
+    }
+    .results-header b { color: var(--text); }
+    .results-empty {
+      padding: 24px 16px; color: var(--muted); text-align: center; font-size: 13px;
+    }
+    .result-row {
+      padding: 10px 16px;
+      display: grid; grid-template-columns: 56px 90px 1fr auto;
+      gap: 12px; align-items: center;
+    }
+    .distance {
+      font-family: ui-monospace, monospace;
+      font-size: 12px; color: var(--accent-2);
+      font-variant-numeric: tabular-nums;
+      background: rgba(94, 226, 197, 0.08);
+      padding: 3px 6px; border-radius: 6px; text-align: center;
+      border: 1px solid rgba(94, 226, 197, 0.2);
+    }
+    .result .sym-file {
+      font-family: ui-monospace, monospace; color: var(--muted); font-size: 12px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    details.sym.result { border-bottom: 1px solid var(--border); }
+    details.sym.result:last-child { border-bottom: 0; }
+    details.sym.result > summary:hover .result-row { background: var(--panel-2); }
+
+    /* markdown answer */
+    .md { padding: 16px 20px; font-size: 14px; line-height: 1.6; }
+    .md > *:first-child { margin-top: 0; }
+    .md > *:last-child { margin-bottom: 0; }
+    .md h1, .md h2, .md h3, .md h4 {
+      margin: 18px 0 8px; font-weight: 600; letter-spacing: -0.01em;
+    }
+    .md h1 { font-size: 18px; }
+    .md h2 { font-size: 16px; }
+    .md h3 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .md h4 { font-size: 13px; }
+    .md p { margin: 8px 0; }
+    .md ul, .md ol { margin: 8px 0; padding-left: 22px; }
+    .md li { margin: 4px 0; }
+    .md strong { color: var(--text); font-weight: 600; }
+    .md a { color: var(--accent); }
+    .md code {
+      font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: var(--panel-2); border: 1px solid var(--border);
+      padding: 1px 6px; border-radius: 5px;
+      color: var(--accent-2);
+    }
+    .md pre {
+      margin: 10px 0; padding: 12px 14px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 8px;
+      overflow-x: auto;
+    }
+    .md pre code {
+      background: transparent; border: 0; padding: 0; color: #cbd5e1;
+      font-size: 12px;
+    }
+    .md blockquote {
+      margin: 10px 0; padding: 6px 14px; color: var(--muted);
+      border-left: 3px solid var(--border); background: var(--panel-2);
+      border-radius: 0 8px 8px 0;
+    }
+
+    /* thinking indicator */
+    .thinking {
+      display: flex; align-items: center; gap: 12px;
+      padding: 18px 20px; color: var(--muted); font-size: 13px;
+    }
+    .thinking .dots { display: inline-flex; gap: 4px; }
+    .thinking .dots span {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent);
+      animation: bounce 1.2s infinite ease-in-out both;
+    }
+    .thinking .dots span:nth-child(2) { animation-delay: 0.15s; }
+    .thinking .dots span:nth-child(3) { animation-delay: 0.30s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0.5); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+    .thinking .label {
+      background: linear-gradient(90deg, var(--muted), var(--text), var(--muted));
+      background-size: 200% 100%;
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 2s infinite linear;
+      font-weight: 500;
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .thinking .elapsed { font-variant-numeric: tabular-nums; font-size: 12px; }
+
+    /* report rows + open-as-report link */
+    .report-row {
+      display: grid; grid-template-columns: 1fr auto auto;
+      gap: 16px; align-items: center;
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      color: var(--text); text-decoration: none;
+    }
+    .report-row:last-child { border-bottom: 0; }
+    .report-row:hover { background: var(--panel-2); text-decoration: none; }
+    .report-q {
+      font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .report-meta {
+      color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, monospace;
+    }
+    .report-arrow { color: var(--muted); }
+    .report-row:hover .report-arrow { color: var(--accent); }
+
+    .open-report {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--accent); text-decoration: none;
+      padding: 4px 10px; border-radius: 6px;
+      border: 1px solid rgba(124, 140, 255, 0.3);
+      background: rgba(124, 140, 255, 0.08);
+    }
+    .open-report:hover { background: rgba(124, 140, 255, 0.15); text-decoration: none; }
+    #chat-header { display: flex; justify-content: space-between; align-items: center; }
+    .rewritten-note {
+      padding: 8px 16px; font-size: 12px; color: var(--muted);
+      background: var(--panel-2); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .rewritten-note .label { font-weight: 600; color: var(--text); }
+    .rewritten-note code {
+      font-family: ui-monospace, monospace; font-size: 12px;
+      color: var(--accent-2); background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="crumbs"><a href="{{ url_for('home') }}">← All repositories</a></div>
+    <h1><span class="owner">{{ repo['owner'] }}/</span>{{ repo['repo_name'] }}</h1>
+    <div class="sub">
+      <span><a href="{{ repo['github_url'] }}" target="_blank" rel="noopener">View on GitHub ↗</a></span>
+      <span>indexed <b>{{ repo['indexed_at'][:10] }}</b></span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Stats from cased-kit -->
+    <div class="stats">
+      <div class="stat">
+        <div class="label">Files in tree</div>
+        <div class="value">{{ repo['file_count'] }}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Symbols extracted</div>
+        <div class="value">{{ symbols|length }}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Files with code</div>
+        <div class="value">{{ files|length }} <small>/ {{ repo['file_count'] }}</small></div>
+      </div>
+      <div class="stat">
+        <div class="label">Embeddings stored</div>
+        <div class="value">{{ vector_count }}</div>
+      </div>
+    </div>
+
+    <h3 class="section">Symbol types <span style="text-transform:none; font-weight:400;">— from <code>kit.extract_symbols()</code></span></h3>
+    <div class="pills">
+      {% for t in type_counts %}
+        <span class="pill"><b>{{ t['n'] }}</b>{{ t['symbol_type'] }}</span>
+      {% endfor %}
+    </div>
+
+    <h3 class="section">Semantic search <span style="text-transform:none; font-weight:400;">— ask a question in plain English; ranked by vector similarity</span></h3>
+    <form class="search-form" method="get" action="{{ url_for('repo_detail', repo_id=repo['repo_id']) }}">
+      <input class="search-input" type="search" name="q" value="{{ query or '' }}"
+             placeholder="e.g. verify a signed timestamp, build a regex character class…"
+             autocomplete="off" />
+      <button class="btn-primary" type="submit">Search</button>
+      {% if query %}
+        <a class="btn-clear" href="{{ url_for('repo_detail', repo_id=repo['repo_id']) }}">Clear</a>
+      {% endif %}
+    </form>
+
+    {% if query %}
+      <div class="panel results">
+        {% if results %}
+          <div class="results-header">
+            <b>{{ results|length }}</b> result{% if results|length != 1 %}s{% endif %}
+            for <i>"{{ query }}"</i>
+          </div>
+          {% for r in results %}
+            <details class="sym result">
+              <summary>
+                <div class="result-row">
+                  <span class="distance">{{ "%.3f"|format(r['distance']) }}</span>
+                  <span class="type-tag {{ r['symbol_type'] }}">{{ r['symbol_type'] }}</span>
+                  <span class="sym-name">{{ r['symbol_name'] }}</span>
+                  <span class="sym-file">{{ r['file_path'] }}:{{ r['start_line'] }}</span>
+                </div>
+              </summary>
+              <pre class="snippet">{{ r['code_snippet'] }}</pre>
+            </details>
+          {% endfor %}
+        {% else %}
+          <div class="results-empty">No results for <i>"{{ query }}"</i>.</div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <h3 class="section">Ask the agent <span style="text-transform:none; font-weight:400;">— RAG over indexed symbols via OpenRouter</span></h3>
+    <form class="search-form" onsubmit="askAgent(event)">
+      <input id="chat-q" class="search-input" type="text"
+             placeholder="e.g. how does the slugify function handle unicode?" autocomplete="off" />
+      <button class="btn-primary" type="submit" id="chat-submit">Ask</button>
+    </form>
+    <div id="chat-out" class="panel" style="display:none; margin-bottom: 28px;">
+      <div class="results-header" id="chat-header"><b>Answer</b></div>
+      <div id="chat-answer" class="md"></div>
+      <div id="chat-sources"></div>
+    </div>
+
+    {% if reports %}
+      <h3 class="section">Past reports <span style="text-transform:none; font-weight:400;">— saved automatically when you ask the agent</span></h3>
+      <div class="panel" style="margin-bottom: 28px;">
+        {% for rep in reports %}
+          <a class="report-row" href="{{ url_for('report_detail', report_id=rep['report_id']) }}">
+            <span class="report-q">{{ rep['question'] }}</span>
+            <span class="report-meta">{{ rep['created_at'][:16].replace('T', ' ') }}</span>
+            <span class="report-arrow">→</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <h3 class="section">Files &amp; symbols <span style="text-transform:none; font-weight:400;">— click a file to expand, click a symbol to see its snippet</span></h3>
+    <div class="toolbar">
+      <input id="filter" type="search" placeholder="Filter by name or file…" oninput="applyFilter()" />
+      <select id="type-filter" onchange="applyFilter()">
+        <option value="">All types</option>
+        {% for t in type_counts %}<option value="{{ t['symbol_type'] }}">{{ t['symbol_type'] }}</option>{% endfor %}
+      </select>
+    </div>
+
+    <div class="panel" id="file-tree">
+      {% for directory, dfiles in dir_list %}
+        <details class="dir" open data-dir="{{ directory|lower }}">
+          <summary>
+            <div class="dir-row">
+              <span class="caret">▸</span>
+              <span class="dir-name {% if not directory %}root{% endif %}">{{ directory or '(root)' }}</span>
+              <span class="dir-meta"><b>{{ dfiles|length }}</b> file{% if dfiles|length != 1 %}s{% endif %}</span>
+            </div>
+          </summary>
+
+          {% for f in dfiles %}
+            <details class="file" data-file="{{ f['file_path']|lower }}">
+              <summary>
+                <div class="file-row">
+                  <span class="caret">▸</span>
+                  <span class="lang {{ f['lang_css'] }}">{{ f['lang_label'] }}</span>
+                  <span class="basename">{{ f['basename'] }}</span>
+                  <span class="num">{{ f['sym_count'] }} symbols</span>
+                  <span class="num">lines {{ f['min_line'] }}–{{ f['max_line'] }}</span>
+                </div>
+              </summary>
+              <div class="sym-children">
+                {% for ftype in type_order %}
+                  {% if groups[f['file_path']].get(ftype) %}
+                    <div class="type-group">
+                      <div class="type-header">{{ ftype }}<b>{{ groups[f['file_path']][ftype]|length }}</b></div>
+                      {% for s in groups[f['file_path']][ftype] %}
+                        <details class="sym"
+                                 data-name="{{ s['symbol_name']|lower }}"
+                                 data-type="{{ s['symbol_type'] }}">
+                          <summary>
+                            <div class="sym-row">
+                              <span class="type-tag {{ s['symbol_type'] }}">{{ s['symbol_type'] }}</span>
+                              <span class="sym-name">{{ s['symbol_name'] }}</span>
+                              <span class="sym-lines">{{ s['start_line'] }}–{{ s['end_line'] }}</span>
+                            </div>
+                          </summary>
+                          <pre class="snippet">{{ s['code_snippet'] }}</pre>
+                        </details>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </details>
+          {% endfor %}
+        </details>
+      {% endfor %}
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    async function askAgent(e) {
+      e.preventDefault();
+      const q = document.getElementById('chat-q').value.trim();
+      if (!q) return;
+      const btn = document.getElementById('chat-submit');
+      const out = document.getElementById('chat-out');
+      const ans = document.getElementById('chat-answer');
+      const src = document.getElementById('chat-sources');
+      btn.disabled = true; btn.textContent = 'Thinking…';
+      out.style.display = ''; src.innerHTML = '';
+      out.querySelectorAll('.rewritten-note').forEach(n => n.remove());
+      const hdr = document.getElementById('chat-header');
+      hdr.innerHTML = '<b>Answer</b>';
+      ans.classList.remove('md');
+      ans.innerHTML = `
+        <div class="thinking">
+          <span class="dots"><span></span><span></span><span></span></span>
+          <span class="label">Searching code &amp; asking the model</span>
+          <span class="elapsed" id="chat-elapsed">0.0s</span>
+        </div>`;
+      const startedAt = performance.now();
+      const tick = setInterval(() => {
+        const el = document.getElementById('chat-elapsed');
+        if (el) el.textContent = ((performance.now() - startedAt) / 1000).toFixed(1) + 's';
+      }, 100);
+      try {
+        const r = await fetch('{{ url_for("chat", repo_id=repo["repo_id"]) }}', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({question: q}),
+        });
+        const ct = r.headers.get('content-type') || '';
+        const data = ct.includes('application/json')
+          ? await r.json()
+          : { error: `Server returned ${r.status} (non-JSON). Check the Flask log.` };
+        ans.classList.add('md');
+        if (!r.ok) { ans.textContent = 'Error: ' + (data.error || r.status); return; }
+        const md = data.answer || '(empty response)';
+        ans.innerHTML = window.marked ? marked.parse(md) : md.replace(/\n/g, '<br>');
+        if (data.report_url) {
+          hdr.innerHTML = '<b>Answer</b>' +
+            `<a class="open-report" href="${data.report_url}">Open as report ↗</a>`;
+        }
+        if (data.rewritten) {
+          const note = document.createElement('div');
+          note.className = 'rewritten-note';
+          note.innerHTML = `<span class="label">Searched for:</span> <code>${data.rewritten}</code>`;
+          ans.parentNode.insertBefore(note, ans);
+        }
+        if (data.sources && data.sources.length) {
+          src.innerHTML = '<div class="results-header"><b>Sources</b></div>' +
+            data.sources.map(s => `
+              <div class="result-row">
+                <span class="distance">${s.distance.toFixed(3)}</span>
+                <span class="type-tag ${s.symbol_type}">${s.symbol_type}</span>
+                <span class="sym-name">${s.symbol_name}</span>
+                <span class="sym-file">${s.file_path}:${s.start_line}</span>
+              </div>`).join('');
+        }
+      } catch (err) {
+        ans.classList.add('md');
+        ans.textContent = 'Request failed: ' + err;
+      } finally {
+        clearInterval(tick);
+        btn.disabled = false; btn.textContent = 'Ask';
+      }
+    }
+
+    function applyFilter() {
+      const q = document.getElementById('filter').value.toLowerCase().trim();
+      const type = document.getElementById('type-filter').value;
+      document.querySelectorAll('details.dir').forEach(dir => {
+        let visibleFiles = 0;
+        dir.querySelectorAll('details.file').forEach(file => {
+          const fileMatches = !q || file.dataset.file.includes(q);
+          let visibleSyms = 0;
+          file.querySelectorAll('details.sym').forEach(sym => {
+            const nameMatch = fileMatches || !q || sym.dataset.name.includes(q);
+            const typeMatch = !type || sym.dataset.type === type;
+            const show = nameMatch && typeMatch;
+            sym.style.display = show ? '' : 'none';
+            if (show) visibleSyms++;
+          });
+          file.hidden = visibleSyms === 0;
+          if (q || type) file.open = visibleSyms > 0;
+          if (!file.hidden) visibleFiles++;
+        });
+        dir.hidden = visibleFiles === 0;
+      });
+    }
+  </script>
+</body>
+</html>

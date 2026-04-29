@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Report #{{ r['report_id'] }} — {{ r['owner'] }}/{{ r['repo_name'] }}</title>
+  <style>
+    :root {
+      --bg: #0b0d10; --panel: #14181d; --panel-2: #1b2127;
+      --border: #262d35; --text: #e6e9ee; --muted: #8a94a3;
+      --accent: #7c8cff; --accent-2: #5ee2c5;
+      --ok: #10b981; --danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(124, 140, 255, 0.18), transparent 60%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header {
+      max-width: 880px; margin: 0 auto;
+      padding: 32px 32px 12px;
+    }
+    .crumbs { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+    .crumbs a { color: var(--muted); }
+    .crumbs a:hover { color: var(--text); }
+
+    .report-meta-bar {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      color: var(--muted); font-size: 12px;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+    .badge {
+      padding: 3px 10px; border-radius: 6px;
+      background: rgba(124, 140, 255, 0.12); color: var(--accent);
+      border: 1px solid rgba(124, 140, 255, 0.3);
+      font-weight: 600;
+    }
+    .badge.model {
+      background: rgba(94, 226, 197, 0.08); color: var(--accent-2);
+      border-color: rgba(94, 226, 197, 0.25);
+      font-family: ui-monospace, monospace; text-transform: none; letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0 0 6px; font-size: 28px; font-weight: 600;
+      letter-spacing: -0.015em; line-height: 1.25;
+    }
+    h1 .q-prefix { color: var(--muted); font-weight: 400; }
+    .repo-line { color: var(--muted); font-size: 13px; }
+    .repo-line a { color: var(--text); font-weight: 500; }
+
+    main { max-width: 880px; margin: 0 auto; padding: 24px 32px 80px; }
+
+    .section-label {
+      margin: 28px 0 10px; font-size: 11px; font-weight: 600;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em;
+    }
+    .section-label:first-child { margin-top: 0; }
+
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+
+    /* markdown body */
+    .md { padding: 28px 32px; }
+    .md > *:first-child { margin-top: 0; }
+    .md > *:last-child { margin-bottom: 0; }
+    .md h1, .md h2, .md h3, .md h4 {
+      margin: 22px 0 10px; font-weight: 600; letter-spacing: -0.01em;
+    }
+    .md h1 { font-size: 22px; }
+    .md h2 { font-size: 18px;
+      padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .md h3 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .md h4 { font-size: 14px; }
+    .md p { margin: 10px 0; }
+    .md ul, .md ol { margin: 10px 0; padding-left: 24px; }
+    .md li { margin: 5px 0; }
+    .md strong { color: var(--text); font-weight: 600; }
+    .md a { color: var(--accent); }
+    .md code {
+      font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: var(--panel-2); border: 1px solid var(--border);
+      padding: 1px 6px; border-radius: 5px;
+      color: var(--accent-2);
+    }
+    .md pre {
+      margin: 14px 0; padding: 14px 16px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 10px;
+      overflow-x: auto;
+    }
+    .md pre code { background: transparent; border: 0; padding: 0; color: #cbd5e1; font-size: 12px; }
+    .md blockquote {
+      margin: 14px 0; padding: 8px 16px; color: var(--muted);
+      border-left: 3px solid var(--accent); background: var(--panel-2);
+      border-radius: 0 10px 10px 0;
+    }
+
+    /* question pull-quote */
+    .question {
+      padding: 20px 24px; font-size: 17px; font-style: italic;
+      color: var(--text); border-left: 3px solid var(--accent);
+      background: linear-gradient(90deg, rgba(124, 140, 255, 0.08), transparent);
+      border-radius: 0 14px 14px 0;
+    }
+
+    /* sources */
+    .source-row {
+      display: grid; grid-template-columns: 60px 90px 1fr auto;
+      gap: 12px; align-items: center;
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .source-row:last-child { border-bottom: 0; }
+    .distance {
+      font: 12px ui-monospace, monospace; color: var(--accent-2);
+      background: rgba(94, 226, 197, 0.08);
+      padding: 3px 6px; border-radius: 6px; text-align: center;
+      border: 1px solid rgba(94, 226, 197, 0.2);
+      font-variant-numeric: tabular-nums;
+    }
+    .type-tag {
+      font-size: 11px; padding: 2px 8px; border-radius: 6px;
+      background: var(--panel-2); color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.04em;
+      text-align: center; font-weight: 500;
+    }
+    .type-tag.function { color: var(--accent); }
+    .type-tag.method   { color: var(--accent-2); }
+    .type-tag.class    { color: #f59e0b; }
+    .type-tag.type     { color: #c084fc; }
+    .sym-name { font-family: ui-monospace, monospace; font-weight: 500; }
+    .sym-file { font: 12px ui-monospace, monospace; color: var(--muted); }
+
+    /* footer actions */
+    .footer-actions {
+      margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border);
+      display: flex; gap: 8px; justify-content: space-between; align-items: center;
+    }
+    .btn {
+      font: inherit; cursor: pointer;
+      padding: 9px 14px; border-radius: 8px;
+      background: var(--panel-2); color: var(--text);
+      border: 1px solid var(--border);
+      text-decoration: none;
+    }
+    .btn:hover { border-color: var(--accent); text-decoration: none; }
+    .btn-danger { color: var(--danger); border-color: rgba(239, 68, 68, 0.25); background: transparent; }
+    .btn-danger:hover { border-color: var(--danger); }
+    form { display: inline; }
+
+    @media print {
+      body { background: white; color: black; }
+      .footer-actions, .crumbs { display: none; }
+      .panel { border-color: #ddd; background: white; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="crumbs">
+      <a href="{{ url_for('home') }}">Acron</a> ›
+      <a href="{{ url_for('repo_detail', repo_id=r['repo_id']) }}">{{ r['owner'] }}/{{ r['repo_name'] }}</a> ›
+      Report #{{ r['report_id'] }}
+    </div>
+    <div class="report-meta-bar">
+      <span class="badge">Report</span>
+      <span class="badge model">{{ r['model'] }}</span>
+      <span>{{ r['created_at'][:10] }} · {{ r['created_at'][11:16] }} UTC</span>
+    </div>
+    <h1><span class="q-prefix">Q.</span> {{ r['question'] }}</h1>
+    <div class="repo-line">
+      Generated against <a href="{{ url_for('repo_detail', repo_id=r['repo_id']) }}">{{ r['owner'] }}/{{ r['repo_name'] }}</a>
+      using {{ sources|length }} retrieved symbol{% if sources|length != 1 %}s{% endif %}.
+    </div>
+  </header>
+
+  <main>
+    <div class="section-label">Answer</div>
+    <div class="panel md" id="answer-body">{{ r['answer'] }}</div>
+
+    {% if sources %}
+      <div class="section-label">Sources <span style="text-transform:none; font-weight:400; letter-spacing:0;">— ranked by vector distance</span></div>
+      <div class="panel">
+        {% for s in sources %}
+          <div class="source-row">
+            <span class="distance">{{ "%.3f"|format(s['distance']) }}</span>
+            <span class="type-tag {{ s['symbol_type'] }}">{{ s['symbol_type'] }}</span>
+            <span class="sym-name">{{ s['symbol_name'] }}</span>
+            <span class="sym-file">{{ s['file_path'] }}:{{ s['start_line'] }}–{{ s['end_line'] }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="footer-actions">
+      <a class="btn" href="{{ url_for('repo_detail', repo_id=r['repo_id']) }}">← Back to repo</a>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn" type="button" onclick="window.print()">Print</button>
+        <form method="post" action="{{ url_for('report_delete', report_id=r['report_id']) }}"
+              onsubmit="return confirm('Delete this report?')">
+          <button class="btn btn-danger" type="submit">Delete report</button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    const body = document.getElementById('answer-body');
+    const raw = body.textContent;
+    if (window.marked) body.innerHTML = marked.parse(raw);
+  </script>
+</body>
+</html>
