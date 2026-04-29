@@ -31,8 +31,8 @@ DB_PATH = Path(__file__).parent / "pipeline.db"
 
 # 384-dim embedding model. Small (~80 MB), fast on CPU, decent quality for
 # code search. Vector dimension MUST match what we declare in the vec0 table.
-EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-EMBED_DIM = 384
+EMBED_MODEL = "jinaai/jina-embeddings-v2-base-code"
+EMBED_DIM = 768
 
 # A small public repo so the pipeline finishes in seconds.
 DEMO_REPO = "https://github.com/sindresorhus/slugify"
@@ -329,7 +329,7 @@ if __name__ == "__main__":
 
     # Loading the model is the slow step (~3s first run, cached after).
     # Done once and reused for both indexing and querying.
-    model = SentenceTransformer(EMBED_MODEL)
+    model = SentenceTransformer(EMBED_MODEL, trust_remote_code=True)
     embed_and_store(conn, model, pairs)
     print(f"[4] embedded + stored {len(pairs)} vectors in symbol_vectors")
 
