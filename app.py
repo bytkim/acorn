@@ -100,6 +100,7 @@ app.secret_key = "dev"  # only for flash messages; replace for prod
 
 # Load the embedding model once at startup. ~3s cold, then cached in RAM.
 _model = SentenceTransformer(EMBED_MODEL, trust_remote_code=True)
+_model.max_seq_length = 1024
 
 # Make sure the schema exists.
 with open_db() as _conn:

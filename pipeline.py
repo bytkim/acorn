@@ -330,6 +330,7 @@ if __name__ == "__main__":
     # Loading the model is the slow step (~3s first run, cached after).
     # Done once and reused for both indexing and querying.
     model = SentenceTransformer(EMBED_MODEL, trust_remote_code=True)
+    model.max_seq_length = 1024
     embed_and_store(conn, model, pairs)
     print(f"[4] embedded + stored {len(pairs)} vectors in symbol_vectors")
 
