@@ -29,26 +29,17 @@ def _openrouter_client(api_key: str) -> OpenAI:
 
 
 def _rewrite_query(api_key: str, question: str, file_paths: list[str], repo) -> str:
-    """One-shot query rewrite. Given the file inventory, ask the model to
-    produce a denser, code-flavored search string for vector retrieval.
-    Returns the original question on any failure."""
-    if not file_paths:
-        return question
-    # Cap file list to keep the prompt small. ~400 paths is plenty signal.
-    paths = "\n".join(file_paths[:400])
-    if len(file_paths) > 400:
-        paths += f"\n... ({len(file_paths) - 400} more)"
+    """One-shot query rewrite. Ask the model to produce a denser, code-flavored
+    search string for vector retrieval. Returns the original question on any
+    failure."""
     system = (
         "You rewrite a user's question into a dense search string for vector "
         "search over a codebase's symbols (functions, classes, methods, types). "
-        "Use terms likely to appear as identifiers or in code comments — file "
-        "names, framework primitives, common verbs (handler, register, fetch, "
-        "auth, route, middleware). Output the rewritten query ONLY, no quotes, "
-        "no preamble."
+        "Use terms likely to appear as identifiers or in code comments. "
+        "Output the rewritten query ONLY, no quotes, no preamble."
     )
     user = (
         f"Repo: {repo['owner']}/{repo['repo_name']}\n"
-        f"File inventory:\n{paths}\n\n"
         f"User question: {question}\n\n"
         "Rewritten query:"
     )
@@ -57,6 +48,7 @@ def _rewrite_query(api_key: str, question: str, file_paths: list[str], repo) -> 
             model=CHAT_MODEL,
             messages=[{"role": "system", "content": system},
                       {"role": "user", "content": user}],
+            temperature=0,
             max_tokens=120,
         )
         out = (resp.choices[0].message.content or "").strip().strip('"').strip("'")
