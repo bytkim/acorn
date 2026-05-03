@@ -46,6 +46,9 @@
     .stat {
       background: var(--panel); border: 1px solid var(--border);
       border-radius: 12px; padding: 14px 16px;
+      transition: border-color 0.15s;
+    }
+    .stat:hover { border-color: var(--accent);
     }
     .stat .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
     .stat .value { font-size: 22px; font-weight: 600; margin-top: 4px; }
@@ -231,6 +234,7 @@
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.15);
     }
+    .search-input::placeholder { color: var(--muted); opacity: 0.6; }
     .btn-primary {
       font: inherit; cursor: pointer;
       padding: 12px 20px; border-radius: 10px;

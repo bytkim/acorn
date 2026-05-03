@@ -19,7 +19,7 @@ import datetime
 from pathlib import Path
 
 import sqlite_vec
-from kit import Repository
+from kit import repository
 from sentence_transformers import SentenceTransformer
 
 
@@ -172,7 +172,7 @@ def set_setting(conn, key: str, value: str) -> None:
 
 
 def index_repo(github_url: str, github_token: str | None = None) -> tuple[list, list]:
-    repo = Repository(github_url, github_token=github_token) if github_token else Repository(github_url)
+    repo = repository(github_url, github_token=github_token) if github_token else repository(github_url)
     file_tree = repo.get_file_tree()
     files = [f for f in file_tree if not f.get("is_dir")]
 
