@@ -19,7 +19,7 @@ import datetime
 from pathlib import Path
 
 import sqlite_vec
-from kit import repository
+from kit.repository import Repository
 from sentence_transformers import SentenceTransformer
 
 
@@ -54,6 +54,9 @@ def open_db() -> sqlite3.Connection:
     # Foreign keys are OFF by default in SQLite (legacy compat). Turn them on
     # per-connection so ON DELETE CASCADE actually fires.
     conn.execute("PRAGMA foreign_keys = ON")
+    # Background indexing means reads and writes can overlap. Give SQLite a
+    # little time to wait on short writer locks instead of failing immediately.
+    conn.execute("PRAGMA busy_timeout = 5000")
     # Row factory so templates can use r['col'] instead of positional indexing.
     conn.row_factory = sqlite3.Row
     return conn
@@ -84,6 +87,18 @@ CREATE TABLE IF NOT EXISTS repositories (
     owner      TEXT NOT NULL,
     indexed_at TEXT NOT NULL,
     file_count INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS indexing_jobs (
+    job_id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    github_url   TEXT NOT NULL,
+    status       TEXT NOT NULL,
+    repo_id      INTEGER REFERENCES repositories(repo_id) ON DELETE SET NULL,
+    file_count   INTEGER,
+    symbol_count INTEGER,
+    error        TEXT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS symbols (
@@ -126,6 +141,12 @@ CREATE VIRTUAL TABLE IF NOT EXISTS symbol_vectors USING vec0(
     symbol_id INTEGER PRIMARY KEY,
     embedding FLOAT[{EMBED_DIM}]
 );
+
+CREATE INDEX IF NOT EXISTS idx_indexing_jobs_status
+ON indexing_jobs(status);
+
+CREATE INDEX IF NOT EXISTS idx_indexing_jobs_github_url_status
+ON indexing_jobs(github_url, status);
 """
 
 
@@ -172,7 +193,7 @@ def set_setting(conn, key: str, value: str) -> None:
 
 
 def index_repo(github_url: str, github_token: str | None = None) -> tuple[list, list]:
-    repo = repository(github_url, github_token=github_token) if github_token else repository(github_url)
+    repo = Repository(github_url, github_token=github_token)
     file_tree = repo.get_file_tree()
     files = [f for f in file_tree if not f.get("is_dir")]
 

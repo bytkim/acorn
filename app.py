@@ -2,6 +2,8 @@
 import datetime
 import json
 import os
+import queue
+import threading
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
@@ -16,7 +18,18 @@ from pipeline import (
 
 load_dotenv()
 
-CHAT_MODEL = "stepfun/step-3.5-flash"
+# CHAT_MODEL = "stepfun/step-3.5-flash"
+
+CHAT_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+
+ACTIVE_INDEX_STATUSES = ("queued", "extracting", "embedding")
+INDEX_STATUS_LABELS = {
+    "queued": "Queued",
+    "extracting": "Extracting files",
+    "embedding": "Embedding symbols",
+    "done": "Ready",
+    "failed": "Failed",
+}
 
 
 def _resolve_key(conn, key: str) -> str:
@@ -95,16 +108,143 @@ def lang_for(filename: str):
             return label
     return ("FILE", "other")
 
+
+def _utc_now() -> str:
+    return datetime.datetime.now(datetime.UTC).isoformat()
+
+
+def _repo_slug(github_url: str) -> str:
+    parts = github_url.rstrip("/").split("/")
+    if len(parts) >= 2:
+        return f"{parts[-2]}/{parts[-1]}"
+    return github_url
+
+
+def _job_to_dict(job) -> dict:
+    data = dict(job)
+    data["label"] = INDEX_STATUS_LABELS.get(data["status"], data["status"])
+    data["slug"] = _repo_slug(data["github_url"])
+    if data["repo_id"]:
+        data["repo_url"] = url_for("repo_detail", repo_id=data["repo_id"])
+    else:
+        data["repo_url"] = None
+    return data
+
+
+def _list_index_jobs(conn, include_done: bool = False):
+    where = "" if include_done else "WHERE status != 'done'"
+    return [
+        _job_to_dict(row)
+        for row in conn.execute(
+            f"""
+            SELECT job_id, github_url, status, repo_id, file_count,
+                   symbol_count, error, created_at, updated_at
+            FROM indexing_jobs
+            {where}
+            ORDER BY updated_at DESC, job_id DESC
+            LIMIT 20
+            """
+        ).fetchall()
+    ]
+
+
+def _update_index_job(conn, job_id: int, status: str | None = None, **fields) -> None:
+    fields["updated_at"] = _utc_now()
+    if status is not None:
+        fields["status"] = status
+    assignments = ", ".join(f"{key}=?" for key in fields)
+    values = list(fields.values()) + [job_id]
+    conn.execute(f"UPDATE indexing_jobs SET {assignments} WHERE job_id=?", values)
+    conn.commit()
+
+
+def _delete_incomplete_repo(conn, repo_id: int | None) -> None:
+    if not repo_id:
+        return
+    conn.execute(
+        "DELETE FROM symbol_vectors WHERE symbol_id IN "
+        "(SELECT symbol_id FROM symbols WHERE repo_id = ?)",
+        (repo_id,),
+    )
+    conn.execute("DELETE FROM repositories WHERE repo_id = ?", (repo_id,))
+    conn.commit()
+
 app = Flask(__name__)
 app.secret_key = "dev"  # only for flash messages; replace for prod
 
 # Load the embedding model once at startup. ~3s cold, then cached in RAM.
 _model = SentenceTransformer(EMBED_MODEL, trust_remote_code=True)
 _model.max_seq_length = 1024
+_model_lock = threading.Lock()
+
+_index_queue: queue.Queue[int] = queue.Queue()
+_index_worker_started = False
+_index_worker_lock = threading.Lock()
+_enqueued_index_jobs: set[int] = set()
 
 # Make sure the schema exists.
 with open_db() as _conn:
     init_schema(_conn)
+
+
+def _perform_indexing_job(job_id: int) -> None:
+    conn = open_db()
+    repo_id = None
+    try:
+        job = conn.execute(
+            "SELECT * FROM indexing_jobs WHERE job_id=?", (job_id,)
+        ).fetchone()
+        if not job or job["status"] not in ACTIVE_INDEX_STATUSES:
+            return
+
+        url = job["github_url"]
+        _update_index_job(conn, job_id, "extracting", error=None)
+        gh_token = _resolve_key(conn, "KIT_GITHUB_TOKEN") or None
+        files, symbols = index_repo(url, github_token=gh_token)
+        _update_index_job(conn, job_id, file_count=len(files))
+
+        pairs = insert_repo(conn, url, files, symbols)
+        repo = conn.execute(
+            "SELECT repo_id FROM repositories WHERE github_url=?", (url,)
+        ).fetchone()
+        repo_id = repo["repo_id"] if repo else None
+        _update_index_job(conn, job_id, "embedding", repo_id=repo_id,
+                          symbol_count=len(pairs))
+
+        with _model_lock:
+            embed_and_store(conn, _model, pairs)
+        _update_index_job(conn, job_id, "done", repo_id=repo_id,
+                          file_count=len(files), symbol_count=len(pairs),
+                          error=None)
+    except Exception as e:
+        _delete_incomplete_repo(conn, repo_id)
+        _update_index_job(conn, job_id, "failed", repo_id=None, error=str(e))
+    finally:
+        conn.close()
+
+
+def _index_worker() -> None:
+    while True:
+        job_id = _index_queue.get()
+        try:
+            _perform_indexing_job(job_id)
+        finally:
+            with _index_worker_lock:
+                _enqueued_index_jobs.discard(job_id)
+            _index_queue.task_done()
+
+
+def _enqueue_index_job(job_id: int) -> None:
+    global _index_worker_started
+    with _index_worker_lock:
+        if not _index_worker_started:
+            worker = threading.Thread(target=_index_worker, daemon=True)
+            worker.start()
+            _index_worker_started = True
+        if job_id in _enqueued_index_jobs:
+            return
+        _enqueued_index_jobs.add(job_id)
+        _index_queue.put(job_id)
 
 
 @app.route("/repo/<int:repo_id>")
@@ -152,7 +292,8 @@ def repo_detail(repo_id):
     query = (request.args.get("q") or "").strip()
     results = []
     if query and has_vectors:
-        results = search(conn, _model, query, k=10, repo_id=repo_id)
+        with _model_lock:
+            results = search(conn, _model, query, k=10, repo_id=repo_id)
 
     reports = conn.execute(
         "SELECT report_id, question, created_at FROM reports "
@@ -202,8 +343,9 @@ def home():
         ORDER BY r.indexed_at DESC
         """
     ).fetchall()
+    jobs = _list_index_jobs(conn)
     conn.close()
-    return render_template("index.html", repos=repos)
+    return render_template("index.html", repos=repos, jobs=jobs)
 
 
 @app.route("/index-repo", methods=["POST"])
@@ -223,13 +365,63 @@ def index_repo_route():
             flash(f"Repo already indexed.", "warn")
             return redirect(url_for("home"))
 
-        gh_token = _resolve_key(conn, "KIT_GITHUB_TOKEN") or None
-        files, symbols = index_repo(url, github_token=gh_token)
-        pairs = insert_repo(conn, url, files, symbols)
-        embed_and_store(conn, _model, pairs)
-        flash(f"Indexed {len(files)} files, {len(pairs)} symbols.", "ok")
+        active = conn.execute(
+            """
+            SELECT job_id FROM indexing_jobs
+            WHERE github_url = ? AND status IN ('queued', 'extracting', 'embedding')
+            """,
+            (url,),
+        ).fetchone()
+        if active:
+            flash("Indexing is already running for that repo.", "warn")
+            return redirect(url_for("home"))
+
+        now = _utc_now()
+        cur = conn.execute(
+            "INSERT INTO indexing_jobs "
+            "(github_url, status, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            (url, "queued", now, now),
+        )
+        job_id = cur.lastrowid
+        conn.commit()
+        _enqueue_index_job(job_id)
+        flash("Indexing started.", "ok")
     except Exception as e:
-        flash(f"Indexing failed: {e}", "error")
+        flash(f"Could not start indexing: {e}", "error")
+    finally:
+        conn.close()
+    return redirect(url_for("home"))
+
+
+@app.route("/index-jobs")
+def index_jobs():
+    conn = open_db()
+    try:
+        return jsonify(jobs=_list_index_jobs(conn, include_done=True))
+    finally:
+        conn.close()
+
+
+@app.route("/index-jobs/<int:job_id>/delete", methods=["POST"])
+def delete_index_job(job_id):
+    conn = open_db()
+    try:
+        job = conn.execute(
+            "SELECT job_id, status, repo_id FROM indexing_jobs WHERE job_id=?",
+            (job_id,),
+        ).fetchone()
+        if not job:
+            flash("Indexing job not found.", "warn")
+            return redirect(url_for("home"))
+        if job["status"] in ACTIVE_INDEX_STATUSES:
+            flash("That repo is still indexing. Wait for it to finish before removing it.", "warn")
+            return redirect(url_for("home"))
+
+        if job["status"] == "failed":
+            _delete_incomplete_repo(conn, job["repo_id"])
+        conn.execute("DELETE FROM indexing_jobs WHERE job_id=?", (job_id,))
+        conn.commit()
+        flash("Indexing job removed.", "ok")
     finally:
         conn.close()
     return redirect(url_for("home"))
@@ -265,7 +457,8 @@ def chat(repo_id):
 
     conn = open_db()
     try:
-        hits = search(conn, _model, rewritten, k=20, repo_id=repo_id)
+        with _model_lock:
+            hits = search(conn, _model, rewritten, k=20, repo_id=repo_id)
     finally:
         conn.close()
 
@@ -387,6 +580,17 @@ def settings():
 def delete_repo(repo_id):
     conn = open_db()
     try:
+        active = conn.execute(
+            """
+            SELECT job_id FROM indexing_jobs
+            WHERE repo_id = ? AND status IN ('queued', 'extracting', 'embedding')
+            """,
+            (repo_id,),
+        ).fetchone()
+        if active:
+            flash("That repo is still indexing. Wait for it to finish before deleting.", "warn")
+            return redirect(url_for("home"))
+
         # Vec0 doesn't honor FK cascades — delete vectors explicitly first.
         conn.execute(
             "DELETE FROM symbol_vectors WHERE symbol_id IN "
