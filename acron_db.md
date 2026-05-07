@@ -60,10 +60,10 @@ erDiagram
     TEXT key PK
     TEXT value
   }
-  repositories ||--|{ symbols : "1:N"
-  repositories ||--|{ reports : "1:N"
-  repositories ||--o{ indexing_jobs : "1:N "
-  symbols ||--|| symbol_vectors : "1:1"
-  symbols ||--|{ notes : "1:N"
-  tags ||--|{ notes : "1:N"
+  repositories ||--|{ symbols : "has (1:N)"
+  repositories ||--|{ reports : "generates (1:N)"
+  repositories ||--o{ indexing_jobs : "tracked by (1:N)"
+  symbols ||--|| symbol_vectors : "embedded as (1:1)"
+  symbols ||--|{ notes : "annotated with (1:N)"
+  tags ||--|{ notes : "labels (1:N)"
 ```
