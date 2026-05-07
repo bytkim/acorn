@@ -132,6 +132,43 @@
     }
     .card .actions form { display: inline; }
 
+    .job-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .job-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .job-card .repo {
+      font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
+      overflow-wrap: anywhere;
+    }
+    .status-pill {
+      font-family: ui-monospace, monospace; font-size: 10px; padding: 3px 8px;
+      border-radius: 100px; white-space: nowrap;
+      background: rgba(124,140,255,0.08);
+      border: 1px solid rgba(124,140,255,0.2);
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    .status-pill.done {
+      background: rgba(94,226,197,0.08);
+      border-color: rgba(94,226,197,0.2);
+      color: var(--accent-2);
+    }
+    .status-pill.failed {
+      background: rgba(239,68,68,0.08);
+      border-color: rgba(239,68,68,0.25);
+      color: var(--danger);
+    }
+    .job-error { color: var(--danger); font-size: 13px; overflow-wrap: anywhere; }
+
     .empty {
       border: 1px dashed var(--border);
       border-radius: 14px; padding: 48px;
@@ -298,7 +335,48 @@
   {% endwith %}
 
   <main>
-    {% if not repos %}
+    {% if jobs %}
+      <div class="section-title" id="jobs-title">
+        <h3>Indexing</h3>
+        <span id="jobs-count">{{ jobs|length }} active</span>
+      </div>
+      <div class="job-grid" id="jobs-grid">
+        {% for job in jobs %}
+          <div class="job-card" data-job-id="{{ job['job_id'] }}">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+              <div class="repo" data-job-slug>{{ job['slug'] }}</div>
+              <span class="status-pill {{ job['status'] }}" data-job-status>{{ job['label'] }}</span>
+            </div>
+            <div class="meta" data-job-meta>
+              {% if job['symbol_count'] %}
+                <span><b>{{ job['symbol_count'] }}</b> symbols</span>
+              {% elif job['file_count'] %}
+                <span><b>{{ job['file_count'] }}</b> files found</span>
+              {% else %}
+                <span>Waiting for worker</span>
+              {% endif %}
+            </div>
+            {% if job['error'] %}
+              <div class="job-error" data-job-error>{{ job['error'] }}</div>
+            {% else %}
+              <div class="job-error" data-job-error hidden></div>
+            {% endif %}
+            <div class="actions">
+              <a class="btn" data-job-link href="{{ job['repo_url'] or '#' }}"
+                 {% if not job['repo_url'] %}hidden{% endif %}>Open repo</a>
+              <a class="btn" href="{{ job['github_url'] }}" target="_blank" rel="noopener">View on GitHub ↗</a>
+              {% if job['status'] not in ['queued', 'extracting', 'embedding'] %}
+                <form method="post" action="{{ url_for('delete_index_job', job_id=job['job_id']) }}">
+                  <button type="submit" class="btn-danger">Dismiss</button>
+                </form>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if not repos and not jobs %}
       <div class="hero">
           <div style="text-align: center; width: 100%;">
           <h1 style="text-align: center; font-size: 28px;">Welcome to Acron</h1>
@@ -311,7 +389,9 @@
         <div style="margin-bottom:18px;">No repositories indexed yet.</div>
         <button class="btn-primary" onclick="openModal()">+ Index your first repo</button>
       </div>
-    {% else %}
+    {% endif %}
+
+    {% if repos %}
       <div class="section-title">
         <h3>Indexed repositories</h3>
         <span>{{ repos|length }} total</span>
@@ -388,14 +468,16 @@
           <div class="stage" data-stage="3"><span class="marker"></span><span>Storing vectors</span></div>
         </div>
         <div class="loading-elapsed" id="loading-elapsed">0.0s elapsed</div>
-        <div class="loading-hint">Larger repos can take 30–90 seconds. The page will redirect when indexing finishes.</div>
+        <div class="loading-hint">The job will appear on the homepage while indexing continues in the background.</div>
       </div>
     </div>
   </div>
 
   <script>
+    const initialJobs = {{ jobs|tojson }};
     const modal = document.getElementById('modal');
     const card = document.getElementById('modal-card');
+    const activeStatuses = new Set(['queued', 'extracting', 'embedding']);
     function openModal() {
       modal.classList.add('open');
       setTimeout(() => document.getElementById('github_url').focus(), 50);
@@ -406,31 +488,14 @@
     }
     function onIndexSubmit() {
       card.setAttribute('data-loading', 'true');
-      // We can't observe real progress (Flask blocks), so advance through
-      // stages on a rough timeline that matches typical run times.
       const stages = document.querySelectorAll('.loading-stages .stage');
       const elapsedEl = document.getElementById('loading-elapsed');
       const startedAt = performance.now();
-      // Stage advance times in seconds (clone, extract, embed, store).
-      const advances = [0, 4, 12, 30];
-      let current = -1;
-      function tick() {
+      stages.forEach((s, i) => s.classList.toggle('active', i === 0));
+      setInterval(() => {
         const elapsed = (performance.now() - startedAt) / 1000;
         elapsedEl.textContent = elapsed.toFixed(1) + 's elapsed';
-        let target = 0;
-        for (let i = 0; i < advances.length; i++) {
-          if (elapsed >= advances[i]) target = i;
-        }
-        if (target !== current) {
-          current = target;
-          stages.forEach((s, i) => {
-            s.classList.toggle('active', i === current);
-            s.classList.toggle('done', i < current);
-          });
-        }
-      }
-      tick();
-      setInterval(tick, 100);
+      }, 100);
     }
     function fillUrl(el) {
       document.getElementById('github_url').value = el.textContent.trim();
@@ -439,6 +504,99 @@
       if (e.key === 'Escape' && modal.classList.contains('open')
           && card.getAttribute('data-loading') !== 'true') closeModal();
     });
+
+    function ensureJobsSection() {
+      let grid = document.getElementById('jobs-grid');
+      if (grid) return grid;
+      const main = document.querySelector('main');
+      const title = document.createElement('div');
+      title.className = 'section-title';
+      title.id = 'jobs-title';
+      title.innerHTML = '<h3>Indexing</h3><span id="jobs-count">0 active</span>';
+      grid = document.createElement('div');
+      grid.className = 'job-grid';
+      grid.id = 'jobs-grid';
+      main.prepend(grid);
+      main.prepend(title);
+      return grid;
+    }
+
+    function jobMeta(job) {
+      if (job.symbol_count !== null && job.symbol_count !== undefined) {
+        return `<span><b>${job.symbol_count}</b> symbols</span>`;
+      }
+      if (job.file_count !== null && job.file_count !== undefined) {
+        return `<span><b>${job.file_count}</b> files found</span>`;
+      }
+      return '<span>Waiting for worker</span>';
+    }
+
+    function updateJobCard(job) {
+      const grid = ensureJobsSection();
+      let cardEl = grid.querySelector(`[data-job-id="${job.job_id}"]`);
+      if (!cardEl) {
+        cardEl = document.createElement('div');
+        cardEl.className = 'job-card';
+        cardEl.dataset.jobId = job.job_id;
+        cardEl.innerHTML = `
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+            <div class="repo" data-job-slug></div>
+            <span class="status-pill" data-job-status></span>
+          </div>
+          <div class="meta" data-job-meta></div>
+          <div class="job-error" data-job-error hidden></div>
+          <div class="actions">
+            <a class="btn" data-job-link href="#" hidden>Open repo</a>
+            <a class="btn" data-job-github target="_blank" rel="noopener">View on GitHub ↗</a>
+            <form method="post" data-job-delete hidden>
+              <button type="submit" class="btn-danger">Dismiss</button>
+            </form>
+          </div>`;
+        grid.prepend(cardEl);
+      }
+      cardEl.querySelector('[data-job-slug]').textContent = job.slug;
+      const status = cardEl.querySelector('[data-job-status]');
+      status.textContent = job.label;
+      status.className = `status-pill ${job.status}`;
+      cardEl.querySelector('[data-job-meta]').innerHTML = jobMeta(job);
+      const error = cardEl.querySelector('[data-job-error]');
+      error.textContent = job.error || '';
+      error.hidden = !job.error;
+      const repoLink = cardEl.querySelector('[data-job-link]');
+      repoLink.hidden = !job.repo_url;
+      if (job.repo_url) repoLink.href = job.repo_url;
+      cardEl.querySelector('[data-job-github]').href = job.github_url;
+      const deleteForm = cardEl.querySelector('[data-job-delete]');
+      if (deleteForm) {
+        deleteForm.hidden = activeStatuses.has(job.status);
+        deleteForm.action = `/index-jobs/${job.job_id}/delete`;
+      }
+    }
+
+    async function pollJobs() {
+      try {
+        const response = await fetch('{{ url_for("index_jobs") }}', {
+          headers: { 'Accept': 'application/json' }
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        data.jobs.forEach(updateJobCard);
+        const count = document.getElementById('jobs-count');
+        if (count) {
+          const active = data.jobs.filter((job) => activeStatuses.has(job.status)).length;
+          count.textContent = active ? `${active} active` : 'up to date';
+        }
+        if (data.jobs.some((job) => activeStatuses.has(job.status))) {
+          setTimeout(pollJobs, 2000);
+        }
+      } catch (error) {
+        setTimeout(pollJobs, 5000);
+      }
+    }
+
+    if (initialJobs.some((job) => activeStatuses.has(job.status))) {
+      setTimeout(pollJobs, 1000);
+    }
   </script>
 </body>
 </html>

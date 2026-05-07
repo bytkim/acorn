@@ -2,3 +2,5 @@
 __pycache__/
 *.db
 .env
+optimize.md
+index_in_background.md
