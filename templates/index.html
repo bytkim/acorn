@@ -473,8 +473,11 @@
     </div>
   </div>
 
+  <script id="initial-jobs" type="application/json">{{ jobs|tojson }}</script>
   <script>
-    const initialJobs = {{ jobs|tojson }};
+    const initialJobs = JSON.parse(
+      document.getElementById('initial-jobs').textContent || '[]'
+    );
     const modal = document.getElementById('modal');
     const card = document.getElementById('modal-card');
     const activeStatuses = new Set(['queued', 'extracting', 'embedding']);
