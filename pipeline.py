@@ -267,20 +267,26 @@ def to_blob(vec: list[float]) -> bytes:
     return struct.pack(f"{len(vec)}f", *vec)
 
 
-def embed_and_store(conn, model, pairs: list[tuple[int, str]]) -> None:
+def embed_and_store(conn, model, pairs: list[tuple[int, str]], batch_size: int = 16) -> None:
     if not pairs:
         return
-    snippets = [code for _, code in pairs]
-    embeddings = model.encode(
-        snippets, normalize_embeddings=True, show_progress_bar=False
-    )
 
-    conn.executemany(
-        "INSERT INTO symbol_vectors (symbol_id, embedding) VALUES (?, ?)",
-        [(pairs[i][0], to_blob(embeddings[i].tolist()))
-         for i in range(len(pairs))],
-    )
-    conn.commit()
+    for start in range(0, len(pairs), batch_size):
+        batch = pairs[start:start + batch_size]
+        snippets = [code for _, code in batch]
+        embeddings = model.encode(
+            snippets,
+            batch_size=batch_size,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+        )
+
+        conn.executemany(
+            "INSERT INTO symbol_vectors (symbol_id, embedding) VALUES (?, ?)",
+            [(batch[i][0], to_blob(embeddings[i].tolist()))
+             for i in range(len(batch))],
+        )
+        conn.commit()
 
 
 # ---------------------------------------------------------------------------

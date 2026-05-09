@@ -458,7 +458,7 @@ def chat(repo_id):
     conn = open_db()
     try:
         with _model_lock:
-            hits = search(conn, _model, rewritten, k=20, repo_id=repo_id)
+            hits = search(conn, _model, rewritten, k=8, repo_id=repo_id)
     finally:
         conn.close()
 
