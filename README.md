@@ -28,7 +28,7 @@ cp .env.example .env   # then fill in keys, or set them via the Settings page
 ## Run
 
 ```bash
-python app.py
+python src/app.py
 # open http://localhost:5001
 ```
 
@@ -37,15 +37,17 @@ From the homepage:
 2. Click into the repo to browse files/symbols and run vector search.
 3. Use the chat box to ask questions — answers cite `file:line` and are saved as reports.
 
-## Files
+## Layout
 
-- `app.py` — Flask routes (home, repo detail, chat, reports, settings).
-- `pipeline.py` — indexing + embedding + search; also runnable standalone as a demo.
-- `schema.sql` — base relational schema (vector table is created at runtime).
+- `src/app.py` — Flask routes (home, repo detail, chat, reports, settings).
+- `src/pipeline.py` — indexing + embedding + search; also runnable standalone as a demo.
+- `sql/schema.sql` — base relational schema (vector table is created at runtime).
 - `templates/` — Jinja templates.
-- `prototype.py`, `prototype_vec.py`, `prototype/` — earlier scratch versions kept for reference.
+- `prototypes/` — earlier scratch versions kept for reference.
+- `docs/` — design notes (e.g. `acron_db.md`).
+- `data/` — SQLite files (`pipeline.db`, `acron.db`) written by the app.
 
 ## Notes
 
-- `pipeline.db` and `acron.db` are SQLite files written by the app. They're gitignored.
+- `data/pipeline.db` and `data/acron.db` are SQLite files written by the app. They're gitignored.
 - API keys can live in `.env` or be set via the in-app Settings page (stored in the DB).

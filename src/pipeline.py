@@ -26,8 +26,7 @@ from sentence_transformers import SentenceTransformer
 # ---------------------------------------------------------------------------
 # Stage 0 — config
 # ---------------------------------------------------------------------------
-# DB lives in a single file alongside this script. The grader sees one .db.
-DB_PATH = Path(__file__).parent / "pipeline.db"
+DB_PATH = Path(__file__).resolve().parent.parent / "data" / "pipeline.db"
 
 # 384-dim embedding model. Small (~80 MB), fast on CPU, decent quality for
 # code search. Vector dimension MUST match what we declare in the vec0 table.

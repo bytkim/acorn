@@ -20,7 +20,7 @@ load_dotenv()
 
 # CHAT_MODEL = "stepfun/step-3.5-flash"
 
-CHAT_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+CHAT_MODEL = "moonshotai/kimi-k2.6"
 
 ACTIVE_INDEX_STATUSES = ("queued", "extracting", "embedding")
 INDEX_STATUS_LABELS = {
@@ -169,7 +169,12 @@ def _delete_incomplete_repo(conn, repo_id: int | None) -> None:
     conn.execute("DELETE FROM repositories WHERE repo_id = ?", (repo_id,))
     conn.commit()
 
-app = Flask(__name__)
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+app = Flask(
+    __name__,
+    template_folder=os.path.join(_REPO_ROOT, "templates"),
+    static_folder=os.path.join(_REPO_ROOT, "static") if os.path.isdir(os.path.join(_REPO_ROOT, "static")) else None,
+)
 app.secret_key = "dev"  # only for flash messages; replace for prod
 
 # Load the embedding model once at startup. ~3s cold, then cached in RAM.
