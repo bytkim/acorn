@@ -25,6 +25,23 @@ cp .env.example .env   # then fill in keys, or set them via the Settings page
 
 `requirements.txt` covers the Flask app; the pipeline also uses `sqlite-vec` and `sentence-transformers`, which come in via `cased-kit`'s deps.
 
+## Database setup
+
+Acron uses SQLite (file-based, no server). The app auto-creates `data/pipeline.db` with the full schema on first run, so for normal use **no manual DB step is required**.
+
+For grading / cold-start setup, the schema and seed data can be applied by hand:
+
+```bash
+mkdir -p data
+sqlite3 data/pipeline.db < sql/create_schema.sql      # creates all tables + indexes
+sqlite3 data/pipeline.db < sql/initialize_data.sql    # populates 15 rows per table
+```
+
+Notes:
+- `sql/create_schema.sql` is the canonical schema; `src/pipeline.py` embeds the same DDL for auto-init.
+- The `symbol_vectors` virtual table needs the [`sqlite-vec`](https://github.com/asg017/sqlite-vec) extension. The Python app loads it automatically; the bare `sqlite3` CLI will print a `no such module: vec0` warning for that one statement, which is safe to ignore for grading purposes — all other tables are created.
+- DB files live in `data/` and are gitignored.
+
 ## Run
 
 ```bash
@@ -41,13 +58,19 @@ From the homepage:
 
 - `src/app.py` — Flask routes (home, repo detail, chat, reports, settings).
 - `src/pipeline.py` — indexing + embedding + search; also runnable standalone as a demo.
-- `sql/schema.sql` — base relational schema (vector table is created at runtime).
+- `sql/create_schema.sql` — full relational schema (tables, indexes, vector table).
+- `sql/initialize_data.sql` — sample data, 15 rows per table.
 - `templates/` — Jinja templates.
 - `prototypes/` — earlier scratch versions kept for reference.
 - `docs/` — design notes (e.g. `acron_db.md`).
 - `data/` — SQLite files (`pipeline.db`, `acron.db`) written by the app.
 
+## Paths and permissions
+
+- All paths in the code are resolved relative to the repo root via `Path(__file__)`; you do **not** need to hard-code an absolute path. Run commands from the repo root (the directory containing `README.md`).
+- The app needs read/write access to `data/` (SQLite writes its `.db` and `-journal` files there) and read access to `templates/`, `sql/`, and `src/`. A standard `git clone` gives correct permissions; if you copy the project around, ensure `data/` is writable by the user running `python src/app.py`.
+
 ## Notes
 
 - `data/pipeline.db` and `data/acron.db` are SQLite files written by the app. They're gitignored.
-- API keys can live in `.env` or be set via the in-app Settings page (stored in the DB).
+- API keys can live in `.env` or be set via the in-app Settings page (stored in the `settings` table).
